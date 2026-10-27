@@ -163,7 +163,7 @@ namespace avel::tape::ui
     };
 
     //==============================================================================
-    // Dark value field under a knob: "‹ 375 ms ›". Arrows step the value, a click on the text edits it.
+    // Dark value field under a knob: "< 375 ms >". Arrows step the value, a click on the text edits it.
     class ValuePill : public juce::Component, public juce::SettableTooltipClient, private juce::Slider::Listener
     {
     public:
@@ -251,7 +251,8 @@ namespace avel::tape::ui
             editor->setText (slider->getTextFromValue (slider->getValue()), false);
             editor->selectAll();
             editor->grabKeyboardFocus();
-            auto close = [this] (bool apply)
+            juce::Component::SafePointer<ValuePill> self (this);
+            auto close = [this, self] (bool apply)
             {
                 if (editor == nullptr) return;
                 if (apply)
@@ -260,9 +261,9 @@ namespace avel::tape::ui
                     if (t.trim().isNotEmpty())
                         slider->setValue (slider->getValueFromText (t));
                 }
-                juce::MessageManager::callAsync ([sp = juce::Component::SafePointer<ValuePill> (this)]
+                juce::MessageManager::callAsync ([self]
                 {
-                    if (sp != nullptr) sp->editor.reset();
+                    if (auto* pill = self.getComponent()) pill->editor.reset();
                 });
             };
             editor->onReturnKey = [close] { close (true); };

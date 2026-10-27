@@ -5,7 +5,7 @@
 
 namespace avel::tape::ui
 {
-    // Preset field in the header: ‹ | Warm Echoes ••• | ›
+    // Preset field in the header: < | Warm Echoes ... | >
     class PresetBox : public juce::Component, public juce::SettableTooltipClient
     {
     public:
