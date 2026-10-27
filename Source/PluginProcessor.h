@@ -75,7 +75,7 @@ private:
     std::atomic<float>* pHeads = nullptr; std::atomic<float>* pWow = nullptr; std::atomic<float>* pFlutter = nullptr;
     std::atomic<float>* pSat = nullptr; std::atomic<float>* pTone = nullptr; std::atomic<float>* pReverb = nullptr;
     std::atomic<float>* pMode = nullptr; std::atomic<float>* pType = nullptr; std::atomic<float>* pNoise = nullptr;
-    std::atomic<float>* pAge = nullptr; std::atomic<float>* pFlutterMod = nullptr;
+    std::atomic<float>* pAge = nullptr; std::atomic<float>* pFlutterMod = nullptr; std::atomic<float>* pPingPong = nullptr;
 
     int currentFactory = 0;
     int abSlot = 0;

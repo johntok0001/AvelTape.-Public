@@ -25,6 +25,7 @@ namespace avel::tape
         inline constexpr const char* noise      = "noise";
         inline constexpr const char* age        = "age";
         inline constexpr const char* flutterMod = "flutterMod";
+        inline constexpr const char* pingPong   = "pingPong";
     }
 
     struct Division { const char* name; double beats; };
@@ -131,6 +132,7 @@ namespace avel::tape
 
         pctParam (pid::age, "Tape Age", 100.0f, 38.0f);
         l.add (std::make_unique<AudioParameterChoice> (ParameterID { pid::flutterMod, v }, "Flutter Mod", StringArray { "Off", "On" }, 1));
+        l.add (std::make_unique<AudioParameterChoice> (ParameterID { pid::pingPong, 2 }, "Ping Pong", StringArray { "Off", "On" }, 0));
         return l;
     }
 
@@ -164,6 +166,9 @@ namespace avel::tape
                                        { pid::tone, 32 }, { pid::reverb, 20 }, { pid::wow, 25 } } },
             { "Vocal Throw", { { pid::sync, 1 }, { pid::division, 6 }, { pid::heads, 0 }, { pid::feedback, 30 }, { pid::mix, 22 },
                                { pid::tone, 40 }, { pid::reverb, 18 }, { pid::saturation, 30 } } },
+            { "Ping Pong Dub", { { pid::sync, 1 }, { pid::division, 5 }, { pid::heads, 0 }, { pid::feedback, 58 }, { pid::mix, 32 },
+                                 { pid::pingPong, 1 }, { pid::wow, 16 }, { pid::saturation, 48 }, { pid::tone, 30 }, { pid::reverb, 18 },
+                                 { pid::tapeType, 2 }, { pid::age, 35 } } },
             { "Ambient Wash", { { pid::time, 600 }, { pid::heads, 5 }, { pid::feedback, 70 }, { pid::mix, 45 }, { pid::reverb, 60 },
                                 { pid::wow, 30 }, { pid::tone, 30 }, { pid::age, 50 } } },
         };

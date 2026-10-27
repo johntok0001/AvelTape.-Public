@@ -44,6 +44,7 @@ namespace avel::tape
         float noiseDb    = -42.0f;  // <= -90 means off
         float age        = 0.38f;
         bool  modulation = true;    // "Flutter Mod" switch
+        bool  pingPong   = false;   // repeats alternate left / right
     };
 
     //==============================================================================
@@ -352,6 +353,7 @@ namespace avel::tape
             const float fl1Inc  = (float) (twoPi * 7.3 / sampleRate);
             const float fl2Inc  = (float) (twoPi * 13.1 / sampleRate);
             const int numCh = right != nullptr ? 2 : 1;
+            const bool pingPong = p.pingPong && numCh == 2;
             float* chans[2] = { left, right };
             float peak = 0.0f;
 
@@ -375,10 +377,11 @@ namespace avel::tape
                 float inMono = 0.0f;
                 float echoOut[2] = { 0, 0 };
 
+                // 1. playback: read the heads of each tape track
+                float fbOut[2] = { 0, 0 };
                 for (int c = 0; c < numCh; ++c)
                 {
-                    const float x = chans[c][i];
-                    inMono += x;
+                    inMono += chans[c][i];
                     const auto& buf = tape[(size_t) c];
 
                     float sum = 0.0f;
@@ -395,18 +398,28 @@ namespace avel::tape
                     s = toneLP[c].lowpass (s);
                     s = toneHP[c].highpass (s);
 
-                    const float echo = s * echoGain;
-                    const float fb = fastTanh (s * fbNorm * g.feedback);
+                    echoOut[c] = s * echoGain;
+                    fbOut[c] = fastTanh (s * fbNorm * g.feedback);
+                    peak = juce::jmax (peak, std::abs (echoOut[c]));
+                }
 
-                    // record: saturation, bandwidth and hiss
-                    const float rec = fastTanh ((x + fb) * drive) * driveComp;
+                // 2. record. Ping pong: the input goes to the left track only and each
+                //    track feeds the other one, so the repeats bounce L, R, L, R...
+                for (int c = 0; c < numCh; ++c)
+                {
+                    float recIn;
+                    if (pingPong)
+                        recIn = c == 0 ? 0.5f * (chans[0][i] + chans[1][i]) + fbOut[1] : fbOut[0];
+                    else
+                        recIn = chans[c][i] + fbOut[c];
+
+                    // saturation, bandwidth and hiss
+                    const float rec = fastTanh (recIn * drive) * driveComp;
                     const float wn = noise.nextFloat() * 2.0f - 1.0f;
                     const float hiss = (wn - 0.65f * hissPrev[c]) * g.noise;
                     hissPrev[c] = wn;
 
                     tape[(size_t) c][(size_t) writePos] = bwLP[c].lowpass (rec) + hiss;
-                    echoOut[c] = echo;
-                    peak = juce::jmax (peak, std::abs (echo));
                 }
 
                 if (numCh == 1) echoOut[1] = echoOut[0];

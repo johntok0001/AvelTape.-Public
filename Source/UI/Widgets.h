@@ -371,6 +371,56 @@ namespace avel::tape::ui
     };
 
     //==============================================================================
+    // One-button toggle in the segmented style (PING PONG), bound to an Off/On parameter.
+    class ChipToggle : public juce::Component, public juce::SettableTooltipClient
+    {
+    public:
+        ChipToggle (juce::RangedAudioParameter& p, juce::String text)
+            : label (std::move (text)), attachment (p, [this] (float v) { on = v > 0.5f; repaint(); }, nullptr)
+        {
+            attachment.sendInitialUpdate();
+            setMouseCursor (juce::MouseCursor::PointingHandCursor);
+        }
+
+        void paint (juce::Graphics& g) override
+        {
+            auto r = getLocalBounds().toFloat();
+            g.setColour (col::segBg);
+            g.fillRoundedRectangle (r, 7.0f);
+            g.setColour (col::segBorder);
+            g.drawRoundedRectangle (r.reduced (0.5f), 7.0f, 1.0f);
+            auto b = r.reduced (2.0f);
+            if (on)
+            {
+                g.setColour (col::amber.withAlpha (0.10f));
+                g.fillRoundedRectangle (b.expanded (3.0f), 7.0f);
+                g.setColour (juce::Colour (0xff1d1610));
+                g.fillRoundedRectangle (b, 5.0f);
+                g.setColour (col::amberLine);
+                g.drawRoundedRectangle (b.reduced (0.5f), 5.0f, 1.0f);
+            }
+            else if (hot)
+            {
+                g.setColour (juce::Colours::white.withAlpha (0.04f));
+                g.fillRoundedRectangle (b, 5.0f);
+            }
+            lamp (g, { b.getX() + 13.0f, b.getCentreY() }, 7.0f, on, 0.6f);
+            text (g, label, font (F::montMedium, 10.0f, 0.1f), b.withTrimmedLeft (22.0f).withTrimmedRight (4.0f),
+                  juce::Justification::centred, on ? col::amber : col::label);
+        }
+
+        void mouseEnter (const juce::MouseEvent&) override { hot = true; repaint(); }
+        void mouseExit (const juce::MouseEvent&) override { hot = false; repaint(); }
+        void mouseDown (const juce::MouseEvent&) override { attachment.setValueAsCompleteGesture (on ? 0.0f : 1.0f); }
+        bool isOn() const { return on; }
+
+    private:
+        juce::String label;
+        bool on = false, hot = false;
+        juce::ParameterAttachment attachment;
+    };
+
+    //==============================================================================
     // Pill switch bound to a bool parameter (Wet only, Flutter Mod).
     class PillSwitch : public juce::Component, public juce::SettableTooltipClient
     {

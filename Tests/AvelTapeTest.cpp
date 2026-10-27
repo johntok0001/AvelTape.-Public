@@ -24,7 +24,7 @@ static void cleanSetup (AvelTapeProcessor& p)
 {
     set (p, pid::sync, 0); set (p, pid::time, 250); set (p, pid::heads, 0); set (p, pid::feedback, 0);
     set (p, pid::mix, 50); set (p, pid::wetOnly, 0); set (p, pid::wow, 0); set (p, pid::flutter, 0);
-    set (p, pid::flutterMod, 0); set (p, pid::saturation, 0); set (p, pid::tone, 100); set (p, pid::reverb, 0);
+    set (p, pid::flutterMod, 0); set (p, pid::pingPong, 0); set (p, pid::saturation, 0); set (p, pid::tone, 100); set (p, pid::reverb, 0);
     set (p, pid::tapeMode, 0); set (p, pid::tapeType, 0); set (p, pid::noise, -90); set (p, pid::age, 0);
 }
 
@@ -133,6 +133,20 @@ static void dspTests()
         check (finite, "random settings: output always finite");
     }
     {
+        AvelTapeProcessor p; cleanSetup (p); set (p, pid::pingPong, 1); set (p, pid::feedback, 60); set (p, pid::wetOnly, 1);
+        auto out = render (p, 1.4, impulse);
+        auto peakCh = [&] (int ch, double ms)
+        {
+            float m = 0;
+            for (int i = (int) ((ms - 4) * 48); i < (int) ((ms + 4) * 48); ++i) m = juce::jmax (m, std::abs (out.getSample (ch, i)));
+            return m;
+        };
+        const float l1 = peakCh (0, 250), r1 = peakCh (1, 250), l2 = peakCh (0, 500), r2 = peakCh (1, 500), l3 = peakCh (0, 750), r3 = peakCh (1, 750);
+        check (l1 > 0.1f && r1 < 0.005f, "ping pong: 1st repeat left only");
+        check (r2 > 0.05f && l2 < 0.005f, "ping pong: 2nd repeat right only");
+        check (l3 > 0.02f && r3 < 0.005f, "ping pong: 3rd repeat left again");
+    }
+    {
         AvelTapeProcessor p;
         set (p, pid::sync, 1); set (p, pid::division, 6);   // 1/4 at 120 BPM (no host) = 500 ms
         check (std::abs (p.computeTimeMs() - 500.0f) < 0.5f, "sync 1/4 at 120 BPM = 500 ms");
@@ -171,7 +185,7 @@ static void stateTests()
     p.selectAB (1);
     check (std::abs (p.apvts.getRawParameterValue (pid::mix)->load() - 90.0f) < 0.5f, "A/B keeps setting B");
     for (int i = 0; i < p.getNumPrograms(); ++i) p.setCurrentProgram (i);
-    check (p.getNumPrograms() == 10, "10 factory presets");
+    check (p.getNumPrograms() == 11, "11 factory presets");
 
     {   // pluginval-style: random normalised values must survive a state round trip
         AvelTapeProcessor x;
@@ -249,6 +263,11 @@ int main (int argc, char** argv)
         AvelTapeProcessor p;
         p.setCurrentProgram (4);
         snapshot (p, "03_worn_75pct", 75);
+    }
+    {
+        AvelTapeProcessor p;
+        p.setCurrentProgram (9);
+        snapshot (p, "04_ping_pong");
     }
 
     std::cout << (failures == 0 ? "ALL TESTS PASSED" : juce::String (failures) + " TEST(S) FAILED") << std::endl;

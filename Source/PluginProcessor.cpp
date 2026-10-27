@@ -14,7 +14,7 @@ AvelTapeProcessor::AvelTapeProcessor()
     pHeads = raw (pid::heads); pWow = raw (pid::wow); pFlutter = raw (pid::flutter);
     pSat = raw (pid::saturation); pTone = raw (pid::tone); pReverb = raw (pid::reverb);
     pMode = raw (pid::tapeMode); pType = raw (pid::tapeType); pNoise = raw (pid::noise);
-    pAge = raw (pid::age); pFlutterMod = raw (pid::flutterMod);
+    pAge = raw (pid::age); pFlutterMod = raw (pid::flutterMod); pPingPong = raw (pid::pingPong);
 
     apvts.state.setProperty ("preset", factoryPresets()[0].name, nullptr);
 }
@@ -75,6 +75,7 @@ void AvelTapeProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     p.noiseDb    = pNoise->load();
     p.age        = pAge->load() / 100.0f;
     p.modulation = pFlutterMod->load() > 0.5f;
+    p.pingPong   = pPingPong->load() > 0.5f;
     engine.setParams (p);
     effectiveTimeMs.store (p.timeMs);
 

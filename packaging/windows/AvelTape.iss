@@ -1,9 +1,9 @@
 ; Inno Setup script for Avel Tape (Windows, VST3).
-; Build:  iscc /DAppVersion=1.0.0 packaging\windows\AvelTape.iss
+; Build:  iscc /DAppVersion=1.1.0 packaging\windows\AvelTape.iss
 ; Expects the plugin at build\AvelTape_artefacts\Release\VST3\Avel Tape.vst3
 
 #ifndef AppVersion
-  #define AppVersion "1.0.0"
+  #define AppVersion "1.1.0"
 #endif
 
 #define Root "..\.."

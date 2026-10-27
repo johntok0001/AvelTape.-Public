@@ -93,9 +93,12 @@ namespace avel::tape::ui
     {
     public:
         TransportView (AvelTapeProcessor& p)
-            : proc (p), heads (*p.apvts.getParameter (pid::heads), headPatternNames(), false)
+            : proc (p), heads (*p.apvts.getParameter (pid::heads), headPatternNames(), false),
+              pingPong (*p.apvts.getParameter (pid::pingPong), "PING PONG")
         {
             addAndMakeVisible (heads);
+            addAndMakeVisible (pingPong);
+            pingPong.setTooltip ("Ping pong: the repeats alternate between left and right");
             heads.setTooltip ("Which playback heads you hear: I = delay time, II = 2x, III = 3x");
             buildReel();
         }
@@ -104,7 +107,9 @@ namespace avel::tape::ui
         {
             const auto f = font (F::montMedium, 11.0f, 0.18f);
             labelW = textWidth (f, "HEAD PATTERN");
-            heads.setBounds ((int) (64.0f + labelW + 20.0f), 11, 6 * 58 + 5 * 2 + 4, 32);
+            const int segX = (int) (labelX + labelW + 16.0f);
+            heads.setBounds (segX, 11, 6 * 52 + 5 * 2 + 4, 32);
+            pingPong.setBounds (heads.getRight() + 10, 11, 108, 32);
         }
 
         void update (float dt)
@@ -126,7 +131,7 @@ namespace avel::tape::ui
             auto r = getLocalBounds().toFloat();   // the dark well itself is drawn by the backdrop
 
             // top row
-            text (g, "HEAD PATTERN", font (F::montMedium, 11.0f, 0.18f), { 64.0f, 10.0f, labelW + 10.0f, 34.0f },
+            text (g, "HEAD PATTERN", font (F::montMedium, 11.0f, 0.18f), { labelX, 10.0f, labelW + 10.0f, 34.0f },
                   juce::Justification::centredLeft, col::label);
             {
                 const auto f = font (F::montMedium, 9.5f, 0.16f);
@@ -240,7 +245,7 @@ namespace avel::tape::ui
         }
 
         // echo pulses within the window, from the current settings
-        struct Pulse { double beats; float amp; };
+        struct Pulse { double beats; float amp; int ch; };
 
         std::vector<Pulse> computePulses (double& rangeBeats) const
         {
@@ -254,14 +259,18 @@ namespace avel::tape::ui
             for (int h = 0; h < 3; ++h) if (hs[(size_t) h]) { ++active; longest = h + 1; }
             active = juce::jmax (1, active);
 
+            const bool pingPongOn = proc.apvts.getRawParameterValue (pid::pingPong)->load() > 0.5f;
+            const double span = juce::jmax (t * longest * 2.6, pingPongOn ? t * 4.2 : 0.0);
             rangeBeats = 2.0;
-            while (rangeBeats < 16.0 && rangeBeats * beatMs < t * longest * 2.6) rangeBeats *= 2.0;
+            while (rangeBeats < 16.0 && rangeBeats * beatMs < span) rangeBeats *= 2.0;
             const double rangeMs = rangeBeats * beatMs;
 
             const float gE = 1.0f / std::sqrt ((float) active);
             const float fbN = fb / (float) active;
+            const bool pp = pingPongOn;
+            struct Rec { double t; float a; int ch; };
             std::vector<Pulse> out;
-            std::vector<std::pair<double, float>> rec { { 0.0, 1.0f } };
+            std::vector<Rec> rec { { 0.0, 1.0f, 0 } };
             for (int iter = 0; iter < 400 && ! rec.empty(); ++iter)
             {
                 auto e = rec.front();
@@ -269,15 +278,15 @@ namespace avel::tape::ui
                 for (int h = 0; h < 3; ++h)
                 {
                     if (! hs[(size_t) h]) continue;
-                    const double tt = e.first + t * (h + 1);
+                    const double tt = e.t + t * (h + 1);
                     if (tt > rangeMs) continue;
-                    const float a = e.second;
+                    const float a = e.a;
                     bool merged = false;
                     for (auto& p : out)
-                        if (std::abs (p.beats * beatMs - tt) < 0.5) { p.amp += a * gE; merged = true; break; }
-                    if (! merged) out.push_back ({ tt / beatMs, a * gE });
+                        if (p.ch == e.ch && std::abs (p.beats * beatMs - tt) < 0.5) { p.amp += a * gE; merged = true; break; }
+                    if (! merged) out.push_back ({ tt / beatMs, a * gE, pp ? e.ch : -1 });
                     if (a * fbN > 0.02f && rec.size() < 64)
-                        rec.push_back ({ tt, juce::jmin (4.0f, a * fbN) });
+                        rec.push_back ({ tt, juce::jmin (4.0f, a * fbN), pp ? 1 - e.ch : 0 });
                 }
             }
             return out;
@@ -338,8 +347,10 @@ namespace avel::tape::ui
                 for (auto& p : pulses)
                 {
                     const float x = 180.0f + (float) (p.beats / range) * 480.0f;
-                    const float h = juce::jlimit (3.0f, 112.0f, p.amp * norm);
-                    const juce::Line<float> ln (x, 78.0f - h * 0.5f, x, 78.0f + h * 0.5f);
+                    const bool split = p.ch >= 0;   // ping pong: left track above, right track below
+                    const float h = juce::jlimit (3.0f, split ? 52.0f : 112.0f, p.amp * norm * (split ? 0.5f : 1.0f));
+                    const float cy = split ? (p.ch == 0 ? 49.0f : 107.0f) : 78.0f;
+                    const juce::Line<float> ln (x, cy - h * 0.5f, x, cy + h * 0.5f);
                     const float strong = idx < 3 ? 1.0f : 0.75f;
                     g.setColour (juce::Colour (0xffff8a1e).withAlpha (0.10f * live));
                     g.drawLine (ln, 14.0f);
@@ -352,6 +363,14 @@ namespace avel::tape::ui
                     ++idx;
                 }
                 rulerRange = range;
+                if (! pulses.empty() && pulses.front().ch >= 0)
+                {
+                    const auto lf = font (F::montMedium, 9.5f, 0.1f);
+                    text (g, "L", lf, { 194.0f, 22.0f, 14.0f, 12.0f }, juce::Justification::centredLeft, col::amber.withAlpha (0.55f));
+                    text (g, "R", lf, { 194.0f, 122.0f, 14.0f, 12.0f }, juce::Justification::centredLeft, col::amber.withAlpha (0.55f));
+                    g.setColour (juce::Colour (0x1affb464));
+                    g.fillRect (184.0f, 78.0f, 484.0f, 1.0f);
+                }
             }
 
             // posts
@@ -429,7 +448,9 @@ namespace avel::tape::ui
 
         AvelTapeProcessor& proc;
         Segmented heads;
+        ChipToggle pingPong;
         juce::Image reel;
+        static constexpr float labelX = 26.0f;
         float reelAngle = 0.0f, labelW = 90.0f;
         float inAct = 0.0f, echoAct = 0.0f;
         double rulerRange = 2.0;
