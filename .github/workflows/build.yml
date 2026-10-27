@@ -21,7 +21,11 @@ jobs:
       - name: Build plugin
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-          cmake --build build --config Release --target AvelTape_VST3 AvelTape_AU --parallel
+          set -o pipefail
+          if ! cmake --build build --config Release --target AvelTape_VST3 AvelTape_AU --parallel 2>&1 | tee build.log; then
+            grep -E "error" build.log | head -10 | sed 's/^/::error::/'
+            exit 1
+          fi
 
       - name: Validate Audio Unit
         run: |
@@ -60,9 +64,14 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build plugin
+        shell: bash
         run: |
           cmake -S . -B build
-          cmake --build build --config Release --target AvelTape_VST3 --parallel
+          set -o pipefail
+          if ! cmake --build build --config Release --target AvelTape_VST3 --parallel 2>&1 | tee build.log; then
+            grep -E "error|fatal" build.log | grep -v "warning" | head -10 | sed 's/^/::error::/'
+            exit 1
+          fi
 
       - name: Validate VST3 with pluginval
         continue-on-error: true
